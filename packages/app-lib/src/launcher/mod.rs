@@ -10,6 +10,7 @@ use crate::state::{
 };
 use crate::util::io;
 use crate::{process, state as st, State};
+use cfg_if::cfg_if;
 use chrono::Utc;
 use daedalus as d;
 use daedalus::minecraft::{LoggingSide, RuleAction, VersionInfo};
@@ -579,7 +580,17 @@ pub async fn launch_minecraft(
     let args = version_info.arguments.clone().unwrap_or_default();
     let mut command = match wrapper {
         Some(hook) => {
-            wrap_ref_builder!(it = Command::new(hook) => {it.arg(&java_version.path)})
+            cfg_if! {
+                if #[cfg(unix)] {
+                    let cmd = shlex::split(hook).expect("invalid input command");
+                    wrap_ref_builder!(it = Command::new(cmd[0].clone()) => {
+                        it.args(&cmd[1..]);
+                        it.arg(&java_version.path);
+                    })
+                } else {
+                    wrap_ref_builder!(it = Command::new(hook) => {it.arg(&java_version.path)})
+                }
+            }
         }
         None => Command::new(&java_version.path),
     };
